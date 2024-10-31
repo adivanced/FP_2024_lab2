@@ -224,41 +224,157 @@ add_to_list(Lst, Elem, N) ->
 %print_set(#hash_set{size = Size, capacity = Capacity, table = Table} = Set) ->
 %print_arr(Table, 0, Capacity*2).
 
-filter(Pred, #hash_set{} = Set) ->
-    Lst = to_list(Set),
-    FilteredList = helper_filter_count(Pred, Lst, 0),
-    from_list(filterhelp(FilteredList)).
+% filter(Pred, #hash_set{} = Set) ->
+%     Lst = to_list(Set),
+%     FilteredList = helper_filter_count(Pred, Lst, 0),
+%     from_list(filterhelp(FilteredList)).
 
-helper_filter_count(_Fun, [], Count) ->
-    {[], Count};
-helper_filter_count(Fun, [undefined | T], Count) ->
-    {_, NewCount} = helper_filter_count(Fun, T, Count),
-    NewCount;
-helper_filter_count(Fun, [H | T], Count) ->
-    case Fun(H) of
-        true ->
-            {FilteredTale, NewCount} = helper_filter_count(Fun, T, Count + 1),
-            {[H | FilteredTale], NewCount};
-        false ->
-            {FilteredTale, NewCount} = helper_filter_count(Fun, T, Count),
-            {[undefined | FilteredTale], NewCount}
+% helper_filter_count(_Fun, [], Count) ->
+%     {[], Count};
+% helper_filter_count(Fun, [undefined | T], Count) ->
+%     {_, NewCount} = helper_filter_count(Fun, T, Count),
+%     NewCount;
+% helper_filter_count(Fun, [H | T], Count) ->
+%     case Fun(H) of
+%         true ->
+%             {FilteredTale, NewCount} = helper_filter_count(Fun, T, Count + 1),
+%             {[H | FilteredTale], NewCount};
+%         false ->
+%             {FilteredTale, NewCount} = helper_filter_count(Fun, T, Count),
+%             {[undefined | FilteredTale], NewCount}
+%     end.
+
+% filterhelp({Lst, _}) ->
+%     lists:nthtail(1, Lst).
+
+filter(Pred, #hash_set{capacity = Capacity, table = Table} = _) ->
+    NewSet = new(10),
+    filter_lower(NewSet, Table, 0, Capacity * 2, Pred).
+
+filter_lower(#hash_set{} = NewSet, Array, I, Lim, Pred) ->
+    case I of
+        Lim ->
+            NewSet;
+        _ ->
+            filter_lower_lower(NewSet, Array, I, Lim, Pred)
     end.
 
-filterhelp({Lst, _}) ->
-    lists:nthtail(1, Lst).
+filter_lower_lower(#hash_set{} = NewSet, Array, I, Lim, Pred) ->
+    Elem = array:get(I, Array),
+    Quan = array:get(I + 1, Array),
+    case Elem of
+        undefined ->
+            filter_lower(NewSet, Array, I + 2, Lim, Pred);
+        _ ->
+            filter_lower(filter_lower_lower_lower(NewSet, Elem, Quan, Pred),
+                         Array,
+                         I + 2,
+                         Lim,
+                         Pred)
+    end.
 
-map(Fun, #hash_set{} = Set) ->
-    Lst = to_list(Set),
-    NewLst = lists:map(Fun, Lst),
-    from_list(NewLst).
+filter_lower_lower_lower(#hash_set{} = NewSet, Elem, Quan, Pred) ->
+    Result = Pred(Elem),
+    case Result of
+        true ->
+            insertn(Elem, Quan, NewSet);
+        false ->
+            NewSet
+    end.
 
-foldl(#hash_set{} = Set, Fun, Acc) ->
-    Lst = to_list(Set),
-    lists:foldl(Fun, Acc, Lst).
+map(Fun, #hash_set{capacity = Capacity, table = Table} = _) ->
+    NewSet = new(Capacity),
+    map_lower(NewSet, Table, 0, Capacity * 2, Fun).
 
-foldr(#hash_set{} = Set, Fun, Acc) ->
-    Lst = to_list(Set),
-    lists:foldr(Fun, Acc, Lst).
+map_lower(#hash_set{} = NewSet, Array, I, Lim, Fun) ->
+    case I of
+        Lim ->
+            NewSet;
+        _ ->
+            map_lower_lower(NewSet, Array, I, Lim, Fun)
+    end.
+
+map_lower_lower(#hash_set{} = NewSet, Array, I, Lim, Fun) ->
+    Elem = array:get(I, Array),
+    Quan = array:get(I + 1, Array),
+    case Elem of
+        undefined ->
+            map_lower(NewSet, Array, I + 2, Lim, Fun);
+        _ ->
+            map_lower(insertn(Fun(Elem), Quan, NewSet), Array, I + 2, Lim, Fun)
+    end.
+
+foldl(#hash_set{capacity = Capacity, table = Table} = _, Fun, Acc) ->
+    foldl(Table, 0, Capacity * 2, Fun, Acc).
+
+foldl(Array, I, Lim, Fun, Acc) ->
+    case I of
+        Lim ->
+            Acc;
+        _ ->
+            foldl_lower(Array, I, Lim, Fun, Acc)
+    end.
+
+foldl_lower(Array, I, Lim, Fun, Acc) ->
+    % io:fwrite(integer_to_list(I)),
+    % io:fwrite(" "),
+    % io:fwrite(integer_to_list(Lim)),
+    % io:fwrite("\n"),
+    Elem = array:get(I, Array),
+    case Elem of
+        undefined ->
+            foldl(Array, I + 2, Lim, Fun, Acc);
+        _ ->
+            NewAcc = foldl_lower_lower(Elem, array:get(I + 1, Array), Fun, Acc),
+            foldl(Array, I + 2, Lim, Fun, NewAcc)
+    end.
+
+foldl_lower_lower(Elem, I, Fun, Acc) ->
+    case I of
+        0 ->
+            Acc;
+        _ ->
+            NewAcc = Fun(Elem, Acc),
+            foldl_lower_lower(Elem, I - 1, Fun, NewAcc)
+    end.
+
+foldr(#hash_set{capacity = Capacity, table = Table} = _, Fun, Acc) ->
+    foldr(Table, Capacity * 2 - 2, 0, Fun, Acc).
+
+foldr(Array, I, Lim, Fun, Acc) ->
+    case I of
+        Lim ->
+            Acc;
+        _ ->
+            foldr_lower(Array, I, Lim, Fun, Acc)
+    end.
+
+foldr_lower(Array, I, Lim, Fun, Acc) ->
+    Elem = array:get(I, Array),
+    case Elem of
+        undefined ->
+            foldr(Array, I - 2, Lim, Fun, Acc);
+        _ ->
+            NewAcc = foldr_lower_lower(Elem, array:get(I + 1, Array), Fun, Acc),
+            foldr(Array, I - 2, Lim, Fun, NewAcc)
+    end.
+
+foldr_lower_lower(Elem, I, Fun, Acc) ->
+    case I of
+        0 ->
+            Acc;
+        _ ->
+            NewAcc = Fun(Elem, Acc),
+            foldr_lower_lower(Elem, I - 1, Fun, NewAcc)
+    end.
+
+% foldl(#hash_set{} = Set, Fun, Acc) ->
+%     Lst = to_list(Set),
+%     lists:foldl(Fun, Acc, Lst).
+
+% foldr(#hash_set{} = Set, Fun, Acc) ->
+%     Lst = to_list(Set),
+%     lists:foldr(Fun, Acc, Lst).
 
 union(#hash_set{size = Size1, capacity = Capacity1} = Set1,
       #hash_set{size = Size2, capacity = Capacity2} = Set2) ->
@@ -280,13 +396,16 @@ union(#hash_set{size = Size1, capacity = Capacity1} = Set1,
     foldl_set_helper(SetWithSet1, Set2, 0).
 
 % main() ->
+%     Lst = [1, 2, 3, 4, 5, 6, 4, 5, 5],
+%     Set = hash:from_list(Lst),
+%     Val = hash:foldl(Set, fun(X, Sum) -> X + Sum end, 0).
 %     Set0 = hash:new(),
 %     Set1 = hash:insert(3, Set0),
 %     Set2 = hash:insert(7, Set1),
 %     Set3 = hash:insert(22, Set2),
 %     Set4 = hash:insert(15, Set3),
 %     Set5 = hash:map(fun(X) -> X * X end, Set4),
-%     hash:has_key(Set5, 9).	
+%     hash:has_key(Set5, 9).
 %     Lst = [1,2,3,4,4,5,5,5,6],
 %     Set = hash:from_list(Lst),
 %     LstNew = hash:to_list(Set),
