@@ -52,28 +52,129 @@ insertn(Key,
 ```
 Свертки (левая и правая):
 ```erlang
-foldl(#hash_set{} = Set, Fun, Acc) ->
-    Lst = to_list(Set),
-    lists:foldl(Fun, Acc, Lst).
+foldl(#hash_set{capacity = Capacity, table = Table} = _, Fun, Acc) ->
+    foldl(Table, 0, Capacity * 2, Fun, Acc).
 
-foldr(#hash_set{} = Set, Fun, Acc) ->
-    Lst = to_list(Set),
-    lists:foldr(Fun, Acc, Lst).
+foldl(Array, I, Lim, Fun, Acc) ->
+    case I of
+        Lim ->
+            Acc;
+        _ ->
+            foldl_lower(Array, I, Lim, Fun, Acc)
+    end.
+
+foldl_lower(Array, I, Lim, Fun, Acc) ->
+    Elem = array:get(I, Array),
+    case Elem of
+        undefined ->
+            foldl(Array, I + 2, Lim, Fun, Acc);
+        _ ->
+            NewAcc = foldl_lower_lower(Elem, array:get(I + 1, Array), Fun, Acc),
+            foldl(Array, I + 2, Lim, Fun, NewAcc)
+    end.
+
+foldl_lower_lower(Elem, I, Fun, Acc) ->
+    case I of
+        0 ->
+            Acc;
+        _ ->
+            NewAcc = Fun(Elem, Acc),
+            foldl_lower_lower(Elem, I - 1, Fun, NewAcc)
+    end.
+
+
+
+foldr(#hash_set{capacity = Capacity, table = Table} = _, Fun, Acc) ->
+    foldr(Table, Capacity * 2 - 2, 0, Fun, Acc).
+
+foldr(Array, I, Lim, Fun, Acc) ->
+    case I of
+        Lim ->
+            Acc;
+        _ ->
+            foldr_lower(Array, I, Lim, Fun, Acc)
+    end.
+
+foldr_lower(Array, I, Lim, Fun, Acc) ->
+    Elem = array:get(I, Array),
+    case Elem of
+        undefined ->
+            foldr(Array, I - 2, Lim, Fun, Acc);
+        _ ->
+            NewAcc = foldr_lower_lower(Elem, array:get(I + 1, Array), Fun, Acc),
+            foldr(Array, I - 2, Lim, Fun, NewAcc)
+    end.
+
+foldr_lower_lower(Elem, I, Fun, Acc) ->
+    case I of
+        0 ->
+            Acc;
+        _ ->
+            NewAcc = Fun(Elem, Acc),
+            foldr_lower_lower(Elem, I - 1, Fun, NewAcc)
+    end.
 ```
 
 Отображение (map):
 ```erlang
-map(Fun, #hash_set{} = Set) ->
-    Lst = to_list(Set),
-    NewLst = lists:map(Fun, Lst),
-    from_list(NewLst).
+map(Fun, #hash_set{capacity = Capacity, table = Table} = _) ->
+    NewSet = new(Capacity),
+    map_lower(NewSet, Table, 0, Capacity * 2, Fun).
+
+map_lower(#hash_set{} = NewSet, Array, I, Lim, Fun) ->
+    case I of
+        Lim ->
+            NewSet;
+        _ ->
+            map_lower_lower(NewSet, Array, I, Lim, Fun)
+    end.
+
+map_lower_lower(#hash_set{} = NewSet, Array, I, Lim, Fun) ->
+    Elem = array:get(I, Array),
+    Quan = array:get(I + 1, Array),
+    case Elem of
+        undefined ->
+            map_lower(NewSet, Array, I + 2, Lim, Fun);
+        _ ->
+            map_lower(insertn(Fun(Elem), Quan, NewSet), Array, I + 2, Lim, Fun)
+    end.
 ```
 Фильтрация (filter):
 ```erlang
-filter(Pred, #hash_set{} = Set) ->
-    Lst = to_list(Set),
-    FilteredList = helper_filter_count(Pred, Lst, 0),
-    from_list(filterhelp(FilteredList)).
+filter(Pred, #hash_set{capacity = Capacity, table = Table} = _) ->
+    NewSet = new(10),
+    filter_lower(NewSet, Table, 0, Capacity * 2, Pred).
+
+filter_lower(#hash_set{} = NewSet, Array, I, Lim, Pred) ->
+    case I of
+        Lim ->
+            NewSet;
+        _ ->
+            filter_lower_lower(NewSet, Array, I, Lim, Pred)
+    end.
+
+filter_lower_lower(#hash_set{} = NewSet, Array, I, Lim, Pred) ->
+    Elem = array:get(I, Array),
+    Quan = array:get(I + 1, Array),
+    case Elem of
+        undefined ->
+            filter_lower(NewSet, Array, I + 2, Lim, Pred);
+        _ ->
+            filter_lower(filter_lower_lower_lower(NewSet, Elem, Quan, Pred),
+                         Array,
+                         I + 2,
+                         Lim,
+                         Pred)
+    end.
+
+filter_lower_lower_lower(#hash_set{} = NewSet, Elem, Quan, Pred) ->
+    Result = Pred(Elem),
+    case Result of
+        true ->
+            insertn(Elem, Quan, NewSet);
+        false ->
+            NewSet
+    end.
 
 ```
 
