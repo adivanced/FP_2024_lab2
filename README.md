@@ -49,6 +49,33 @@ insertn(Key,
                          capacity = Capacity,
                          table = NewTable2}
     end.
+
+removen(Key,
+        Amount,
+        #hash_set{size = Size,
+                  capacity = Capacity,
+                  table = Table} =
+            Set) ->
+    Index = hash(Key, Capacity),
+    Qua = get_elementq(Index, Table),
+    Tval = Qua - Amount,
+    case Tval of
+        0 ->
+            NewTable1 = array:set(Index * 2, undefined, Table),
+            NewTable2 = array:set(Index * 2 + 1, 0, NewTable1),
+            %Tmp = print_arr(NewTable2, 0, Capacity*2),
+            Set#hash_set{size = Size - 1,
+                         capacity = Capacity,
+                         table = NewTable2};
+        _ when Tval =< -1 ->
+            Set;
+        _ ->
+            NewTable1 = array:set(Index * 2 + 1, Qua - 1, Table),
+            %Tmp = print_arr(NewTable1, 0, Capacity*2),
+            Set#hash_set{size = Size,
+                         capacity = Capacity,
+                         table = NewTable1}
+    end.
 ```
 Свертки (левая и правая):
 ```erlang
